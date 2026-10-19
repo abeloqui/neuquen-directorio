@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Administración · Directorio de Neuquén</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="admin">
+<header class="top"><h1>Administración <small>directorio comunitario</small></h1><a class="btn" href="index.html">← Volver al mapa</a></header>
+
+<section id="login" class="caja">
+  <form id="fLogin"><label>Contraseña<input id="pass" type="password" autocomplete="current-password" required></label>
+  <button class="btn prim">Entrar</button><p id="err" role="alert"></p></form>
+</section>
+
+<section id="panel" class="caja" hidden>
+  <p class="nota">Los cambios se guardan como <b>borrador en este navegador</b>. Para publicarlos: <b>Exportar JSON</b>, reemplazá <code>lugares.json</code> en el proyecto y volvé a desplegar. Podés verlos antes en <a href="index.html?borrador=1">el mapa con borrador</a>.</p>
+  <div class="acc">
+    <button id="bExp" class="btn prim">Exportar JSON</button>
+    <label class="btn">Importar JSON<input id="bImp" type="file" accept="application/json" hidden></label>
+    <button id="bRes" class="btn">Descartar borrador</button>
+    <button id="bOut" class="btn">Salir</button>
+  </div>
+  <div class="acc"><label class="btn">Importar CSV de espacios culturales (Datos Abiertos)<input id="bCsv" type="file" accept=".csv,text/csv" hidden></label></div>
+  <div id="imp" class="nota" hidden>
+    <div class="acc"><label>Localidad <select id="selLoc"></select></label>
+    <label class="chk"><input type="checkbox" id="chkPriv" checked> Excluir espacios privados/comerciales</label></div>
+    <p id="impInfo" role="status"></p><button id="bAdd" class="btn prim">Agregar al borrador</button>
+  </div>
+  <h2 id="tForm">Agregar lugar</h2>
+  <form id="f" class="grid">
+    <label>Nombre<input name="nombre" required></label>
+    <label>Categoría<select name="categoria" id="selCat"></select></label>
+    <label>Tipo (ej: CAPS, Farmacia)<input name="subtipo"></label>
+    <label>Dirección<input name="direccion"></label>
+    <label>Barrio<input name="barrio"></label>
+    <label>Teléfono<input name="telefono" inputmode="tel"></label>
+    <label>WhatsApp (solo números, con 549)<input name="whatsapp" inputmode="numeric" placeholder="5492990000000"></label>
+    <label>Sitio web<input name="web" type="url"></label>
+    <label>Horarios (0=dom … 6=sáb)<input name="horarios" placeholder="1-5 08:30-20:00; 6 09:00-13:00"></label>
+    <label class="chk"><input name="h24" type="checkbox"> Abierto 24 horas</label>
+    <label class="full">Descripción<textarea name="descripcion" rows="2"></textarea></label>
+    <label class="full">Datos específicos (uno por línea, <code>Clave: valor</code>)<textarea name="extra" rows="3" placeholder="Cupos: 20 plazas"></textarea></label>
+    <label>Latitud<input name="lat" required inputmode="decimal"></label>
+    <label>Longitud<input name="lng" required inputmode="decimal"></label>
+    <div class="full"><small>Hacé clic en el mapa para completar latitud y longitud.</small><div id="pick"></div></div>
+    <div class="acc full"><button class="btn prim">Guardar lugar</button><button type="button" id="bCan" class="btn">Cancelar edición</button></div>
+  </form>
+  <h2>Lugares (<span id="n">0</span>)</h2><ul id="lst"></ul>
+</section>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="js/config.js"></script>
+<script src="js/shared.js"></script>
+<script src="js/importar.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
