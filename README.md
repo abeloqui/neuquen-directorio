@@ -1,61 +1,101 @@
-# Directorio Comunitario de Neuquén
+# 📍 Neuquén Mejora
 
-Web estática (HTML + CSS + JS vanilla), PWA, mapa Leaflet + OpenStreetMap. Sin analítica, sin cuentas, sin publicidad.
-La ubicación del usuario se procesa solo en su navegador.
+Plataforma ciudadana para reportar problemas de **infraestructura** e **inseguridad** en Neuquén Capital sobre un mapa. Cualquier vecino puede reportar sin registrarse, pero **nada se publica sin aprobación** de la persona administradora.
+
+## Características
+
+- Mapa público (Leaflet + OpenStreetMap) con solo los reportes aprobados, marcadores por tipo y categoría, filtros por tipo, categoría, barrio y fecha.
+- Formulario de reporte sin registro: geolocalización o selección manual, foto opcional (se comprime en el navegador), contacto visible solo para el admin.
+- Panel de administración protegido (Supabase Auth): aprobar, rechazar, editar, cambiar estado, destacar, mover ubicación, crear y eliminar reportes.
+- Ranking público de barrios con fórmula transparente, pesos editables y ajuste manual con motivo visible.
+- Estadísticas: reportes por estado, barrios con más problemas abiertos y evolución mensual.
+- Modo oscuro, diseño mobile-first y SEO básico (metadatos, sitemap, robots).
+
+## Stack
+
+Next.js 14 (App Router) · TypeScript · Tailwind CSS · Leaflet / react-leaflet · Supabase (Postgres, Auth, Storage) · Recharts · Vercel.
 
 ## Estructura
+
 ```
-index.html · admin.html · lugares.json · manifest.json · sw.js · vercel.json
-css/style.css
-js/shared.js   categorías, horarios, estado abierto/cerrado, distancia
-js/app.js      mapa, filtros, ficha, favoritos, geolocalización
-js/admin.js    panel de administración
-js/config.js   hash SHA-256 de la contraseña
-icons/
+app/            Páginas públicas, panel /admin y API (/api/reports)
+components/     UI, mapa, formularios y componentes del admin
+lib/            Clientes de Supabase, constantes, tipos, ranking
+supabase/       schema.sql (tablas, vistas, RLS, storage, datos iniciales)
+middleware.ts   Protege /admin (sesión + pertenencia a la tabla admins)
 ```
 
-## Desplegar en Vercel
-**Con GitHub (recomendado):** subí la carpeta a un repo → vercel.com → *Add New → Project* → elegí el repo →
-*Framework Preset: Other*, sin build command ni output directory → *Deploy*.
-**Con CLI:** `npm i -g vercel` y, dentro de la carpeta, `vercel --prod`.
-Para probar local: `npx serve .` (la geolocalización y el service worker requieren `localhost` o HTTPS).
+## Seguridad
 
-## Actualizar lugares
-1. Entrá a `/admin.html`, ingresá la contraseña y agregá, editá o eliminá lugares (clic en el mapa para tomar coordenadas).
-2. Los cambios quedan como **borrador en tu navegador**; revisalos en `/index.html?borrador=1`.
-3. **Exportar JSON** → reemplazá `lugares.json` en el proyecto → commit/deploy. También podés **Importar** un JSON.
-Los usuarios reciben la actualización la próxima vez que abran la app (el service worker refresca en segundo plano).
+- La tabla `reports` tiene RLS: solo el admin accede. El público lee la vista `public_reports`, que **no incluye el contacto**.
+- Los reportes se crean desde `/api/reports` (servidor, service role) con validación, honeypot y límite básico por IP.
+- `SUPABASE_SERVICE_ROLE_KEY` solo se usa en el servidor. Nunca la expongas con `NEXT_PUBLIC_`.
+- El límite por IP es en memoria (por instancia serverless): sirve como primera barrera, no como protección fuerte. Si hay abuso, sumá Cloudflare Turnstile o Upstash Ratelimit.
 
-## Contraseña del panel
-Contraseña inicial: `neuquen2026`. Para cambiarla, generá el hash y pegalo en `js/config.js`:
+## 1. Configurar Supabase
+
+1. Creá un proyecto en [supabase.com](https://supabase.com).
+2. Entrá a **SQL Editor → New query**, pegá todo `supabase/schema.sql` y ejecutalo.
+3. Verificá en **Table Editor** que existan `reports`, `neighborhoods` (50 barrios), `report_categories`, `ranking_settings` y `admins`, y en **Storage** el bucket público `report-photos`.
+4. En **Project Settings → API** copiá la `Project URL`, la `anon public key` y la `service_role key`.
+5. En **Authentication → Providers → Email**, desactivá **Allow new users to sign up** para que nadie pueda registrarse.
+
+## 2. Crear el usuario administrador
+
+1. **Authentication → Users → Add user → Create new user**: ingresá tu email y una contraseña fuerte, y marcá *Auto Confirm User*.
+2. En el **SQL Editor** ejecutá (con tu email):
+
+```sql
+insert into public.admins (user_id)
+select id from auth.users where email = 'tu@email.com';
 ```
-printf 'MiNuevaClave' | sha256sum        # Linux/Mac
+
+3. Ingresá en `/admin/login` con ese email y contraseña.
+
+## 3. Variables de entorno
+
+Copiá `.env.example` a `.env.local` (local) o cargalas en Vercel:
+
+| Variable | Descripción |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave pública anon |
+| `SUPABASE_SERVICE_ROLE_KEY` | Clave service role (solo servidor) |
+| `NEXT_PUBLIC_SITE_URL` | URL pública del sitio, sin barra final |
+
+## 4. Desplegar en Vercel
+
+1. Subí el proyecto a un repositorio de GitHub.
+2. En [vercel.com](https://vercel.com) → **Add New → Project** → importá el repositorio (Framework: Next.js, se detecta solo).
+3. En **Environment Variables** cargá las cuatro variables de arriba.
+4. **Deploy**. Cuando termine, actualizá `NEXT_PUBLIC_SITE_URL` con el dominio real y redeployá.
+
+## Desarrollo local (opcional)
+
+```bash
+npm install
+cp .env.example .env.local
+npm run dev
 ```
-o en la consola del navegador:
-`crypto.subtle.digest('SHA-256',new TextEncoder().encode('MiNuevaClave')).then(b=>console.log([...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')))`
 
-**Importante:** al ser un sitio estático, la verificación ocurre en el navegador. Sirve para evitar errores y curiosos, pero
-no es seguridad real: el hash es público y el panel solo edita un borrador local. Lo que se publica es lo que vos subas a
-`lugares.json`, por eso la protección real es quién tiene acceso al repositorio.
+## Cálculo del ranking de barrios
 
-## Formato de horarios
-`"1-5 08:30-20:00; 6 09:00-13:00"` (0 = domingo … 6 = sábado). Para 24 horas: `"h24": true`.
-"Cierra pronto" = faltan 60 minutos o menos.
+Un puntaje **más alto** significa **más problemas** (el puesto 1 es el barrio más afectado). Solo cuentan reportes aprobados:
 
-## Datos de ejemplo
-Los 15 lugares son **ejemplos con coordenadas aproximadas**; verificá y completá direcciones y teléfonos antes de publicar
-(los WhatsApp `5492990000000` son marcadores de posición).
+```
+score = infraestructura abierta × 3
+      + seguridad (últimos 90 días) × 4
+      + días promedio de resolución (tope 60) × 0,1
+      − resueltos (últimos 90 días) × 1
+      ± ajuste manual (público, con motivo)
+```
 
-## Soberanía total (opcional)
-Leaflet se carga desde unpkg con verificación de integridad y se guarda en caché para uso offline. Para no depender de ningún CDN,
-descargá Leaflet 1.9.4 a `vendor/leaflet/`, cambiá las rutas en `index.html` y `admin.html`, y quitá `https://unpkg.com` del CSP en `vercel.json`.
-Las teselas vienen de OpenStreetMap (respetá su [política de uso](https://operations.osmfoundation.org/policies/tiles/); para mucho tráfico conviene un proveedor propio).
+Los pesos viven en la tabla `ranking_settings` y se editan desde `/admin/ranking`. El cálculo se hace en la vista SQL `neighborhood_ranking` y se replica en `lib/ranking.ts`. No normaliza por población ni superficie.
 
-## Datos abiertos (Portal de Datos Abiertos del Neuquén)
-- **Espacios culturales:** el relevamiento de ODAFyC (CC BY 4.0, marzo 2025) ya aporta 13 lugares reales de Neuquén Capital (bibliotecas populares, centros culturales, museos).
-  Para sumar más, bajá el CSV de <https://portaldatosabiertos.neuquen.gov.ar/dataset/espacios-culturales-del-neuquen> y usá en el panel
-  **Importar CSV de espacios culturales**: elegís la localidad, el importador descarta filas sin coordenadas o con ubicación dudosa, evita duplicados y agrega todo al borrador.
-  Como la licencia exige atribución, cada lugar importado muestra su fuente y el pie de página la cita.
-- **Límites del dato:** no trae horarios ni teléfonos (se completan a mano en el panel) y tiene errores propios (ej. direcciones de una ciudad con coordenadas de otra, que el importador filtra).
-- **Pendiente:** el portal también publica "Espacios deportivos" y "Gestión de Residuos Sólidos Urbanos" (CSV); el segundo parece listar sitios de disposición final, no puntos de reciclaje para vecinos, así que conviene revisarlo antes de usarlo.
-  El catálogo SIG Estadística (<https://sigestadistica.neuquen.gov.ar/catalogue/>) es un GeoNode que se carga con JavaScript; cuando identifiques una capa útil (centros de salud, comisarías), podemos sumar un importador para ese formato.
+## Estados de un reporte
+
+`Pendiente` → `Aprobado` → `En proceso` → `Resuelto` (o `Rechazado`). Son públicos Aprobado, En proceso y Resuelto.
+
+## Licencia
+
+MIT
